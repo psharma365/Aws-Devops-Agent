@@ -1,6 +1,8 @@
-# DevOps AI Agent
+# Agentic DevOps Copilot
 
-An intelligent DevOps agent built on **AWS Bedrock AgentCore** that uses the **Model Context Protocol (MCP)** to manage AWS infrastructure, monitor resource health, and report incidents via Microsoft Teams.
+An intelligent DevOps assistant built on **AWS Bedrock AgentCore** and the **Model Context Protocol (MCP)** to monitor cloud health, diagnose infrastructure issues, and coordinate operational responses across AWS resources and Microsoft Teams.
+
+This project demonstrates how an AI agent can orchestrate tools, reason over alerts, and support real-world cloud operations in a production-oriented environment.
 
 ## Architecture
 
