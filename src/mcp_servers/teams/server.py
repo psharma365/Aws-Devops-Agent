@@ -2,14 +2,13 @@
 Microsoft Teams MCP Server.
 
 Exposes notification tools over the Model Context Protocol.
-Transport: streamable-http (for AgentCore Runtime hosting).
 """
 
 from __future__ import annotations
 
 import json
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from src.mcp_servers.teams.tools import (
     create_incident_notification,
@@ -18,22 +17,17 @@ from src.mcp_servers.teams.tools import (
 from src.utils.aws_helpers import setup_logging
 
 logger = setup_logging("mcp-server.teams")
-
-# ── Server setup ─────────────────────────────────────────────────────────
-
-mcp = FastMCP("teams-server", host="0.0.0.0", stateless_http=True)
-
-# ── Tool registrations ───────────────────────────────────────────────────
+server = MCPServer("teams-server")
 
 
-@mcp.tool()
+@server.tool(name="send_teams_message")
 async def send_teams_message_tool(message: str) -> str:
     """Send a plain-text message to the configured Microsoft Teams channel."""
     result = await send_teams_message(message=message)
     return json.dumps(result, indent=2, default=str)
 
 
-@mcp.tool()
+@server.tool(name="create_incident_notification")
 async def create_incident_notification_tool(
     severity: str,
     instance_id: str,
@@ -56,13 +50,10 @@ async def create_incident_notification_tool(
     return json.dumps(result, indent=2, default=str)
 
 
-# ── Entry point ──────────────────────────────────────────────────────────
-
-
 def main() -> None:
-    """Run the MCP server over streamable-http transport."""
-    logger.info("Starting Teams MCP server (streamable-http) …")
-    mcp.run(transport="streamable-http")
+    """Run the MCP server over stdio transport."""
+    logger.info("Starting Teams MCP server …")
+    server.run(transport="stdio")
 
 
 if __name__ == "__main__":

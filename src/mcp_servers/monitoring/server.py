@@ -2,15 +2,13 @@
 CloudWatch Monitoring MCP Server.
 
 Exposes metrics retrieval tools over the Model Context Protocol.
-Transport: streamable-http (for AgentCore Runtime hosting).
 """
 
 from __future__ import annotations
 
 import json
-from typing import List
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from src.mcp_servers.monitoring.tools import (
     get_cpu_metrics,
@@ -21,15 +19,10 @@ from src.mcp_servers.monitoring.tools import (
 from src.utils.aws_helpers import setup_logging
 
 logger = setup_logging("mcp-server.monitoring")
-
-# ── Server setup ─────────────────────────────────────────────────────────
-
-mcp = FastMCP("monitoring-server", host="0.0.0.0", stateless_http=True)
-
-# ── Tool registrations ───────────────────────────────────────────────────
+server = MCPServer("monitoring-server")
 
 
-@mcp.tool()
+@server.tool(name="get_cpu_metrics")
 async def get_cpu_metrics_tool(
     instance_id: str,
     period: int = 300,
@@ -44,9 +37,9 @@ async def get_cpu_metrics_tool(
     return json.dumps(result, indent=2, default=str)
 
 
-@mcp.tool()
+@server.tool(name="get_cpu_metrics_for_instances")
 async def get_cpu_metrics_for_instances_tool(
-    instance_ids: List[str],
+    instance_ids: list[str],
     period: int = 300,
     minutes: int = 60,
 ) -> str:
@@ -59,7 +52,7 @@ async def get_cpu_metrics_for_instances_tool(
     return json.dumps(result, indent=2, default=str)
 
 
-@mcp.tool()
+@server.tool(name="get_memory_metrics")
 async def get_memory_metrics_tool(
     instance_id: str,
     period: int = 300,
@@ -74,7 +67,7 @@ async def get_memory_metrics_tool(
     return json.dumps(result, indent=2, default=str)
 
 
-@mcp.tool()
+@server.tool(name="get_disk_usage")
 async def get_disk_usage_tool(
     instance_id: str,
     mount_path: str = "/",
@@ -91,13 +84,10 @@ async def get_disk_usage_tool(
     return json.dumps(result, indent=2, default=str)
 
 
-# ── Entry point ──────────────────────────────────────────────────────────
-
-
 def main() -> None:
-    """Run the MCP server over streamable-http transport."""
-    logger.info("Starting Monitoring MCP server (streamable-http) …")
-    mcp.run(transport="streamable-http")
+    """Run the MCP server over stdio transport."""
+    logger.info("Starting Monitoring MCP server …")
+    server.run(transport="stdio")
 
 
 if __name__ == "__main__":

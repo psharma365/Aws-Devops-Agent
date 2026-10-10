@@ -14,5 +14,8 @@ lambda_response.json
 model_test.json
 cms/
 
+# local-only notes that should never be pushed
+docs/commit-history-plan.md
+
 # Windows reserved device names
 NUL
