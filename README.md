@@ -4,6 +4,16 @@ An intelligent DevOps assistant built on **AWS Bedrock AgentCore** and the **Mod
 
 This project demonstrates how an AI agent can orchestrate tools, reason over alerts, and support real-world cloud operations in a production-oriented environment.
 
+## Project Overview
+
+The repository is designed to combine cloud monitoring with agentic automation:
+
+- detect infrastructure issues with CloudWatch alarms and EventBridge triggers
+- route alerts into an AWS Lambda-based agent workflow
+- use Bedrock reasoning to interpret operational context and choose next steps
+- connect to AWS and Teams through MCP servers for action and communication
+- deploy the whole stack through CDK for repeatable environment setup
+
 ## Architecture
 
 ```mermaid
