@@ -12,6 +12,17 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+def _as_mapping(value: Any) -> dict[str, Any]:
+    """Return a dict-like object from a nested alarm payload."""
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, dict):
+                return item
+    return {}
+
+
 @dataclass
 class AlarmEvent:
     """Parsed CloudWatch alarm event from EventBridge."""
@@ -61,36 +72,57 @@ def parse_eventbridge_alarm(event: dict[str, Any]) -> AlarmEvent:
     if isinstance(detail, str):
         detail = json.loads(detail)
 
-    # Extract the alarm configuration
     config = detail.get("configuration", {})
-    metrics = config.get("metrics", [{}])
-    metric_stat = metrics[0].get("metricStat", {}) if metrics else {}
-    metric = metric_stat.get("metric", {})
-    dimensions = metric.get("dimensions", {})
+    metrics = config.get("metrics", [])
+    if not isinstance(metrics, list):
+        metrics = [metrics]
 
-    # Try to find the instance ID from dimensions
-    instance_id = dimensions.get("InstanceId", "")
+    metric_stat = {}
+    metric: dict[str, Any] = {}
+    for candidate in metrics:
+        candidate_map = _as_mapping(candidate)
+        candidate_metric_stat = _as_mapping(candidate_map.get("metricStat"))
+        candidate_metric = _as_mapping(candidate_metric_stat.get("metric"))
+        if candidate_metric or candidate_metric_stat:
+            metric_stat = candidate_metric_stat
+            metric = candidate_metric
+            break
 
-    # State info
+    dimensions = _as_mapping(metric.get("dimensions"))
+    if not dimensions:
+        dimensions = _as_mapping(detail.get("dimensions"))
+
+    instance_id = (
+        detail.get("instanceId")
+        or detail.get("instance_id")
+        or dimensions.get("InstanceId")
+        or dimensions.get("instanceId")
+        or ""
+    )
+
     state = detail.get("state", {})
     previous_state = detail.get("previousState", {})
+    state_value = state if isinstance(state, str) else _as_mapping(state).get("value", "UNKNOWN")
+    previous_value = previous_state if isinstance(previous_state, str) else _as_mapping(previous_state).get("value", "UNKNOWN")
+    reason = state if isinstance(state, str) else _as_mapping(state).get("reason", "")
+    timestamp = state if isinstance(state, str) else _as_mapping(state).get("timestamp", event.get("time", ""))
 
     return AlarmEvent(
         alarm_name=detail.get("alarmName", ""),
         alarm_description=detail.get("alarmDescription", ""),
-        state=state.get("value", "UNKNOWN"),
-        previous_state=previous_state.get("value", "UNKNOWN"),
-        reason=state.get("reason", ""),
-        timestamp=state.get("timestamp", event.get("time", "")),
+        state=state_value,
+        previous_state=previous_value,
+        reason=reason,
+        timestamp=timestamp,
         region=event.get("region", ""),
         account_id=event.get("account", ""),
         instance_id=instance_id,
         metric_name=metric.get("name", ""),
         namespace=metric.get("namespace", ""),
-        threshold=float(config.get("threshold", 0)),
+        threshold=float(config.get("threshold", 0) or 0),
         comparison_operator=config.get("comparisonOperator", ""),
-        evaluation_periods=int(config.get("evaluationPeriods", 0)),
-        period=int(metric_stat.get("period", 0)),
+        evaluation_periods=int(config.get("evaluationPeriods", 0) or 0),
+        period=int(metric_stat.get("period", 0) or 0),
         raw_event=event,
     )
 
