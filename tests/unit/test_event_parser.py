@@ -4,6 +4,8 @@ Unit tests for the EventBridge event parser.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from src.handlers.event_parser import (
@@ -34,6 +36,19 @@ class TestParseEventBridgeAlarm:
     def test_parse_empty_detail_raises(self):
         with pytest.raises(ValueError, match="no 'detail'"):
             parse_eventbridge_alarm({"source": "aws.cloudwatch", "detail": {}})
+
+    def test_parse_stringified_detail(self, sample_alarm_event):
+        event = {**sample_alarm_event, "detail": json.dumps(sample_alarm_event["detail"])}
+
+        alarm = parse_eventbridge_alarm(event)
+
+        assert alarm.alarm_name == "devops-agent-high-cpu"
+        assert alarm.instance_id == "i-0abc123def456789a"
+
+    @pytest.mark.parametrize("detail", ['"not an object"', "[]", "null"])
+    def test_parse_non_object_stringified_detail_raises(self, detail):
+        with pytest.raises(ValueError, match=r"detail.*JSON object"):
+            parse_eventbridge_alarm({"source": "aws.cloudwatch", "detail": detail})
 
     def test_parse_handles_dict_metrics_and_top_level_instance_id(self):
         event = {

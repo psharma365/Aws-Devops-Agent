@@ -71,6 +71,8 @@ def parse_eventbridge_alarm(event: dict[str, Any]) -> AlarmEvent:
     # The detail itself may be a JSON string in some test payloads
     if isinstance(detail, str):
         detail = json.loads(detail)
+    if not isinstance(detail, dict):
+        raise ValueError("Event 'detail' must be a JSON object")
 
     config = detail.get("configuration", {})
     metrics = config.get("metrics", [])
