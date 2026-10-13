@@ -10,11 +10,13 @@ import os
 import time
 import urllib.error
 import urllib.request
+from typing import Any
 from urllib.parse import quote
 
 import boto3
 from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
+from botocore.exceptions import ClientError
 
 REGION = os.environ.get("AWS_REGION", "ap-southeast-2")
 AGENT_RUNTIME_ARN = os.environ.get(
@@ -39,7 +41,7 @@ _dedup_table = _ddb.Table(APPROVALS_TABLE)
 # ── Alarm parsing ────────────────────────────────────────────────────────
 
 
-def _parse_alarm(event):
+def _parse_alarm(event: dict[str, Any]) -> dict[str, Any]:
     detail = event.get("detail", {})
     config = detail.get("configuration", {})
     metrics = config.get("metrics", [{}])
@@ -57,7 +59,7 @@ def _parse_alarm(event):
     }
 
 
-def _detect_alarm_type(alarm_name):
+def _detect_alarm_type(alarm_name: str) -> str:
     name_lower = alarm_name.lower()
     if "cpu" in name_lower:
         return "cpu"
@@ -71,53 +73,45 @@ def _detect_alarm_type(alarm_name):
 # ── Deduplication ────────────────────────────────────────────────────────
 
 
-def _is_duplicate_alarm(alarm_name):
-    """Check if this alarm was already processed within DEDUP_WINDOW seconds.
-
-    Uses the existing approvals DynamoDB table with a key prefix of
-    ``alarm_dedup:`` to avoid collisions with real approval records.
-    """
-    dedup_key = f"alarm_dedup:{alarm_name}"
-    try:
-        resp = _dedup_table.get_item(Key={"approval_id": dedup_key})
-        item = resp.get("Item")
-        if item:
-            processed_at = int(item.get("processed_at", 0))
-            age = int(time.time()) - processed_at
-            if age < DEDUP_WINDOW:
-                print(f"DEDUP: {alarm_name} was processed {age}s ago (window={DEDUP_WINDOW}s), skipping")
-                return True
-    except Exception as e:
-        # If dedup check fails, proceed — better to process than miss an alarm
-        print(f"DEDUP check failed (proceeding anyway): {e}")
-    return False
-
-
-def _mark_alarm_processed(alarm_name):
-    """Record that this alarm has been processed.
-
-    The TTL attribute auto-deletes the record after 1 hour so the table
-    doesn't accumulate stale dedup entries.
-    """
+def _claim_alarm(alarm_name: str) -> bool:
+    """Atomically claim an alarm unless it was processed within DEDUP_WINDOW."""
+    now = int(time.time())
     dedup_key = f"alarm_dedup:{alarm_name}"
     try:
         _dedup_table.put_item(
             Item={
                 "approval_id": dedup_key,
-                "processed_at": int(time.time()),
-                "ttl": int(time.time()) + 3600,  # Auto-delete after 1 hour
-            }
+                "processed_at": now,
+                "ttl": now + 3600,
+            },
+            ConditionExpression=(
+                "attribute_not_exists(approval_id) "
+                "OR attribute_not_exists(processed_at) "
+                "OR processed_at <= :cutoff"
+            ),
+            ExpressionAttributeValues={":cutoff": now - DEDUP_WINDOW},
         )
-    except Exception as e:
-        print(f"DEDUP mark failed: {e}")
+    except ClientError as exc:
+        error_code = exc.response.get("Error", {}).get("Code")
+        if error_code == "ConditionalCheckFailedException":
+            print(f"DEDUP: {alarm_name} was processed within {DEDUP_WINDOW}s, skipping")
+            return True
+        print(f"DEDUP claim failed (proceeding anyway): {exc}")
+    except Exception as exc:
+        print(f"DEDUP claim failed (proceeding anyway): {exc}")
+
+    return False
 
 
 # ── Agent invocation ─────────────────────────────────────────────────────
 
 
-def _invoke_agentcore(prompt):
+def _invoke_agentcore(prompt: str) -> dict[str, Any]:
     # Fetch fresh credentials on every invocation to avoid expiry in warm Lambdas
-    credentials = boto3.Session(region_name=REGION).get_credentials().get_frozen_credentials()
+    session_credentials = boto3.Session(region_name=REGION).get_credentials()
+    if session_credentials is None:
+        raise RuntimeError("AWS credentials are unavailable; cannot sign the AgentCore request")
+    credentials = session_credentials.get_frozen_credentials()
 
     payload = json.dumps({"prompt": prompt}).encode("utf-8")
     request = AWSRequest(method="POST", url=AGENTCORE_INVOKE_URL, data=payload)
@@ -147,7 +141,7 @@ def _invoke_agentcore(prompt):
 # ── Handler ──────────────────────────────────────────────────────────────
 
 
-def handler(event, context):
+def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     print(f"Lambda invoked: {json.dumps(event, default=str)[:500]}")
 
     alarm = _parse_alarm(event)
@@ -162,14 +156,11 @@ def handler(event, context):
         }
 
     # Deduplication — skip if this alarm was already processed recently
-    if _is_duplicate_alarm(alarm["alarm_name"]):
+    if _claim_alarm(alarm["alarm_name"]):
         return {
             "statusCode": 200,
             "body": json.dumps({"status": "deduplicated", "alarm": alarm["alarm_name"]}),
         }
-
-    # Mark as processing BEFORE invoking agent to prevent parallel races
-    _mark_alarm_processed(alarm["alarm_name"])
 
     alarm_type = _detect_alarm_type(alarm["alarm_name"])
 
@@ -177,7 +168,7 @@ def handler(event, context):
         f"A CloudWatch alarm fired for instance {alarm['instance_id']}.\n"
         f"Alarm: {alarm['alarm_name']}. Reason: {alarm['reason']}. "
         f"State: {alarm['state']}. Timestamp: {alarm['timestamp']}.\n"
-        f"Investigate this alarm and take appropriate action following your runbook."
+        f"Alarm category: {alarm_type}. Investigate this alarm and take appropriate action following your runbook."
     )
 
     print(f"Invoking AgentCore: {AGENTCORE_INVOKE_URL[:80]}")
