@@ -50,6 +50,25 @@ class TestParseEventBridgeAlarm:
         with pytest.raises(ValueError, match=r"detail.*JSON object"):
             parse_eventbridge_alarm({"source": "aws.cloudwatch", "detail": detail})
 
+    def test_parse_string_states_uses_event_timestamp_and_detail_reason(self):
+        event = {
+            "source": "aws.cloudwatch",
+            "time": "2026-10-14T10:00:00Z",
+            "detail": {
+                "alarmName": "cpu-high",
+                "state": "ALARM",
+                "previousState": "OK",
+                "reason": "CPU utilization exceeded the threshold",
+            },
+        }
+
+        alarm = parse_eventbridge_alarm(event)
+
+        assert alarm.state == "ALARM"
+        assert alarm.previous_state == "OK"
+        assert alarm.reason == "CPU utilization exceeded the threshold"
+        assert alarm.timestamp == "2026-10-14T10:00:00Z"
+
     def test_parse_handles_dict_metrics_and_top_level_instance_id(self):
         event = {
             "source": "aws.cloudwatch",

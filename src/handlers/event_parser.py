@@ -104,10 +104,12 @@ def parse_eventbridge_alarm(event: dict[str, Any]) -> AlarmEvent:
 
     state = detail.get("state", {})
     previous_state = detail.get("previousState", {})
-    state_value = state if isinstance(state, str) else _as_mapping(state).get("value", "UNKNOWN")
-    previous_value = previous_state if isinstance(previous_state, str) else _as_mapping(previous_state).get("value", "UNKNOWN")
-    reason = state if isinstance(state, str) else _as_mapping(state).get("reason", "")
-    timestamp = state if isinstance(state, str) else _as_mapping(state).get("timestamp", event.get("time", ""))
+    state_details = _as_mapping(state)
+    previous_state_details = _as_mapping(previous_state)
+    state_value = state if isinstance(state, str) else state_details.get("value", "UNKNOWN")
+    previous_value = previous_state if isinstance(previous_state, str) else previous_state_details.get("value", "UNKNOWN")
+    reason = state_details.get("reason", detail.get("reason", ""))
+    timestamp = state_details.get("timestamp", detail.get("timestamp", event.get("time", "")))
 
     return AlarmEvent(
         alarm_name=detail.get("alarmName", ""),
