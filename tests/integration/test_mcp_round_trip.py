@@ -44,6 +44,9 @@ class TestMCPRoundTrip:
             assert "describe_ec2_instance" in tool_names
             assert "restart_ec2_instance" in tool_names
             assert len(tools.tools) == 3
+            list_instances_tool = next(tool for tool in tools.tools if tool.name == "list_ec2_instances")
+            assert list_instances_tool.input_schema["type"] == "object"
+            assert "state_filter" in list_instances_tool.input_schema["properties"]
 
     @pytest.mark.asyncio
     async def test_monitoring_tool_discovery(self):

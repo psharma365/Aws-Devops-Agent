@@ -56,7 +56,7 @@ class TestParseEventBridgeAlarm:
             "time": "2026-10-14T10:00:00Z",
             "detail": {
                 "alarmName": "cpu-high",
-                "state": "ALARM",
+                "state": {"value": "ALARM", "reason": None},
                 "previousState": "OK",
                 "reason": "CPU utilization exceeded the threshold",
             },

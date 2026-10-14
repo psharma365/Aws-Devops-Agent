@@ -153,7 +153,7 @@ class MCPClient:
             td = ToolDefinition(
                 name=tool.name,
                 description=tool.description or "",
-                input_schema=tool.inputSchema if isinstance(tool.inputSchema, dict) else {},
+                input_schema=tool.input_schema if isinstance(tool.input_schema, dict) else {},
                 server_name=server.name,
             )
             server.tools.append(td)
