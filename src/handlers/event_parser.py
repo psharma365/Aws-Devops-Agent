@@ -85,10 +85,12 @@ def parse_eventbridge_alarm(event: dict[str, Any]) -> AlarmEvent:
         candidate_map = _as_mapping(candidate)
         candidate_metric_stat = _as_mapping(candidate_map.get("metricStat"))
         candidate_metric = _as_mapping(candidate_metric_stat.get("metric"))
-        if candidate_metric or candidate_metric_stat:
+        if candidate_metric:
             metric_stat = candidate_metric_stat
             metric = candidate_metric
             break
+        if candidate_metric_stat and not metric_stat:
+            metric_stat = candidate_metric_stat
 
     dimensions = _as_mapping(metric.get("dimensions"))
     if not dimensions:

@@ -105,6 +105,35 @@ class TestParseEventBridgeAlarm:
         assert alarm.state == "ALARM"
         assert alarm.period == 300
 
+    def test_parse_skips_incomplete_metric_before_valid_metric(self):
+        event = {
+            "source": "aws.cloudwatch",
+            "detail": {
+                "alarmName": "disk-usage-high",
+                "state": {"value": "ALARM"},
+                "configuration": {
+                    "metrics": [
+                        {"metricStat": {"period": 60}},
+                        {
+                            "metricStat": {
+                                "metric": {
+                                    "namespace": "CWAgent",
+                                    "name": "disk_used_percent",
+                                },
+                                "period": 300,
+                            }
+                        },
+                    ]
+                },
+            },
+        }
+
+        alarm = parse_eventbridge_alarm(event)
+
+        assert alarm.metric_name == "disk_used_percent"
+        assert alarm.namespace == "CWAgent"
+        assert alarm.period == 300
+
 
 @pytest.mark.unit
 class TestBuildAgentPrompt:
