@@ -107,24 +107,24 @@ def _claim_alarm(alarm_name: str) -> bool:
 
 
 def _invoke_agentcore(prompt: str) -> dict[str, Any]:
-    # Fetch fresh credentials on every invocation to avoid expiry in warm Lambdas
-    session_credentials = boto3.Session(region_name=REGION).get_credentials()
-    if session_credentials is None:
-        raise RuntimeError("AWS credentials are unavailable; cannot sign the AgentCore request")
-    credentials = session_credentials.get_frozen_credentials()
-
-    payload = json.dumps({"prompt": prompt}).encode("utf-8")
-    request = AWSRequest(method="POST", url=AGENTCORE_INVOKE_URL, data=payload)
-    request.headers["Content-Type"] = "application/json"
-    SigV4Auth(credentials, "bedrock-agentcore", REGION).add_auth(request)
-
-    http_request = urllib.request.Request(
-        url=AGENTCORE_INVOKE_URL,
-        data=payload,
-        headers=dict(request.headers),
-        method="POST",
-    )
     try:
+        # Fetch fresh credentials on every invocation to avoid expiry in warm Lambdas
+        session_credentials = boto3.Session(region_name=REGION).get_credentials()
+        if session_credentials is None:
+            raise RuntimeError("AWS credentials are unavailable; cannot sign the AgentCore request")
+        credentials = session_credentials.get_frozen_credentials()
+
+        payload = json.dumps({"prompt": prompt}).encode("utf-8")
+        request = AWSRequest(method="POST", url=AGENTCORE_INVOKE_URL, data=payload)
+        request.headers["Content-Type"] = "application/json"
+        SigV4Auth(credentials, "bedrock-agentcore", REGION).add_auth(request)
+
+        http_request = urllib.request.Request(
+            url=AGENTCORE_INVOKE_URL,
+            data=payload,
+            headers=dict(request.headers),
+            method="POST",
+        )
         with urllib.request.urlopen(http_request, timeout=300) as resp:
             body = resp.read().decode("utf-8")
             print(f"AgentCore response: status={resp.status}, len={len(body)}")

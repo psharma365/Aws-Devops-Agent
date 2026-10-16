@@ -77,7 +77,7 @@ def test_handler_includes_alarm_category_in_agent_prompt(monkeypatch, sample_ala
 
 
 @pytest.mark.unit
-def test_invoke_agentcore_reports_missing_aws_credentials(monkeypatch):
+def test_handler_returns_error_when_aws_credentials_are_unavailable(monkeypatch, sample_alarm_event):
     class SessionWithoutCredentials:
         def __init__(self, region_name: str) -> None:
             self.region_name = region_name
@@ -86,6 +86,9 @@ def test_invoke_agentcore_reports_missing_aws_credentials(monkeypatch):
             return None
 
     monkeypatch.setattr(lambda_handler.boto3, "Session", SessionWithoutCredentials)
+    monkeypatch.setattr(lambda_handler, "_claim_alarm", lambda _alarm_name: False)
 
-    with pytest.raises(RuntimeError, match="AWS credentials are unavailable"):
-        lambda_handler._invoke_agentcore("Investigate the alarm")
+    response = lambda_handler.handler(sample_alarm_event, None)
+
+    assert response["statusCode"] == 500
+    assert "AWS credentials are unavailable" in response["body"]
