@@ -18,6 +18,8 @@ from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
 from botocore.exceptions import ClientError
 
+from src.handlers.event_parser import parse_eventbridge_alarm
+
 REGION = os.environ.get("AWS_REGION", "ap-southeast-2")
 AGENT_RUNTIME_ARN = os.environ.get(
     "AGENT_RUNTIME_ARN", "arn:aws:bedrock-agentcore:ap-southeast-2:650251690796:runtime/devops_agent-AYHFY5ECcy"
@@ -42,20 +44,14 @@ _dedup_table = _ddb.Table(APPROVALS_TABLE)
 
 
 def _parse_alarm(event: dict[str, Any]) -> dict[str, Any]:
-    detail = event.get("detail", {})
-    config = detail.get("configuration", {})
-    metrics = config.get("metrics", [{}])
-    metric_stat = metrics[0].get("metricStat", {}) if metrics else {}
-    metric = metric_stat.get("metric", {})
-    dimensions = metric.get("dimensions", {})
-    state = detail.get("state", {})
+    alarm = parse_eventbridge_alarm(event)
     return {
-        "alarm_name": detail.get("alarmName", ""),
-        "state": state.get("value", "UNKNOWN"),
-        "reason": state.get("reason", ""),
-        "timestamp": state.get("timestamp", event.get("time", "")),
-        "region": event.get("region", ""),
-        "instance_id": dimensions.get("InstanceId", ""),
+        "alarm_name": alarm.alarm_name,
+        "state": alarm.state,
+        "reason": alarm.reason,
+        "timestamp": alarm.timestamp,
+        "region": alarm.region,
+        "instance_id": alarm.instance_id,
     }
 
 

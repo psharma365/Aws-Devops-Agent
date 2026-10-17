@@ -4,6 +4,8 @@ Shared test fixtures for the DevOps AI Agent test suite.
 
 from __future__ import annotations
 
+import copy
+
 import pytest
 
 
@@ -63,3 +65,15 @@ def sample_alarm_event() -> dict:
             },
         },
     }
+
+
+@pytest.fixture
+def dict_metric_alarm_event(sample_alarm_event: dict) -> dict:
+    """Alarm event variant with dict metrics and a top-level instance ID."""
+    event = copy.deepcopy(sample_alarm_event)
+    detail = event["detail"]
+    detail["instanceId"] = "i-0abc123def456789a"
+    detail["state"] = "ALARM"
+    detail["reason"] = "CPU utilization exceeded the threshold"
+    detail["configuration"]["metrics"] = detail["configuration"]["metrics"][0]
+    return event

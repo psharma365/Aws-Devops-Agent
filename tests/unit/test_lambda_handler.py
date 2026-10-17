@@ -8,6 +8,17 @@ from botocore.exceptions import ClientError
 import src.handlers.lambda_handler as lambda_handler
 
 
+@pytest.mark.unit
+def test_parse_alarm_supports_dict_metrics_and_top_level_instance_id(dict_metric_alarm_event):
+    alarm = lambda_handler._parse_alarm(dict_metric_alarm_event)
+
+    assert alarm["alarm_name"] == "devops-agent-high-cpu"
+    assert alarm["state"] == "ALARM"
+    assert alarm["reason"] == "CPU utilization exceeded the threshold"
+    assert alarm["timestamp"] == dict_metric_alarm_event["time"]
+    assert alarm["instance_id"] == "i-0abc123def456789a"
+
+
 class StubTable:
     def __init__(self, error_code: str | None = None) -> None:
         self.error_code = error_code
