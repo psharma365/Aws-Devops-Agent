@@ -220,6 +220,14 @@ class MCPClient:
                 server.session.call_tool(name, arguments or {}),
                 timeout=settings.tool_timeout_seconds,
             )
+            if result.is_error:
+                error_text = "\n".join(
+                    content.text for content in result.content if hasattr(content, "text")
+                )
+                message = error_text or f"MCP tool {name} reported an error"
+                logger.error("Tool %s returned an MCP error: %s", name, message)
+                return {"error": True, "message": message}
+
             # Parse the text content from the response
             if result.content and len(result.content) > 0:
                 first = result.content[0]
