@@ -17,6 +17,41 @@ class StubSession:
         return self.result
 
 
+class StubContext:
+    def __init__(self) -> None:
+        self.exited = False
+
+    async def __aexit__(self, *exc_info: object) -> None:
+        self.exited = True
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_disconnect_clears_sessions_and_discovered_tools():
+    client = MCPClient()
+    server = client._servers["aws-infra"]
+    server.session = StubSession(SimpleNamespace(is_error=False, content=[]))
+    server.tools.append(
+        SimpleNamespace(
+            name="diagnose_instance",
+            description="Run diagnostics",
+            input_schema={},
+            server_name="aws-infra",
+        )
+    )
+    client._tool_index["diagnose_instance"] = "aws-infra"
+    context = StubContext()
+    client._contexts.append(context)
+
+    await client.disconnect_all()
+
+    assert context.exited
+    assert server.session is None
+    assert server.tools == []
+    assert client._tool_index == {}
+    assert client._contexts == []
+
+
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_call_tool_returns_mcp_error_as_error_result():

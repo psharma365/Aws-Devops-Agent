@@ -167,6 +167,10 @@ class MCPClient:
             except Exception as exc:
                 logger.warning("Error closing context: %s", exc)
         self._contexts.clear()
+        self._tool_index.clear()
+        for server in self._servers.values():
+            server.session = None
+            server.tools.clear()
 
     # ── Tool discovery ───────────────────────────────────────────────────
 
