@@ -34,6 +34,9 @@ async def get_cpu_metrics(
         Dict with ``instance_id``, ``datapoints`` (timestamp, average,
         max, min), and ``summary`` (avg, peak, latest).
     """
+    if error := _validate_metric_window(period, minutes):
+        return error
+
     cw = get_client("cloudwatch")
     end = datetime.now(UTC)
     start = end - timedelta(minutes=minutes)
@@ -90,6 +93,9 @@ async def get_cpu_metrics_for_instances(
     Returns:
         Dict mapping each instance_id to its metrics result.
     """
+    if error := _validate_metric_window(period, minutes):
+        return error
+
     results: dict[str, Any] = {}
     for iid in instance_ids:
         results[iid] = await get_cpu_metrics(iid, period=period, minutes=minutes)
@@ -114,6 +120,9 @@ async def get_memory_metrics(
         Dict with datapoints and summary, or a stub message if the
         CloudWatch Agent is not installed.
     """
+    if error := _validate_metric_window(period, minutes):
+        return error
+
     cw = get_client("cloudwatch")
     end = datetime.now(UTC)
     start = end - timedelta(minutes=minutes)
@@ -174,6 +183,9 @@ async def get_disk_usage(
     Returns:
         Dict with datapoints and summary.
     """
+    if error := _validate_metric_window(period, minutes):
+        return error
+
     cw = get_client("cloudwatch")
     end = datetime.now(UTC)
     start = end - timedelta(minutes=minutes)
@@ -223,6 +235,23 @@ async def get_disk_usage(
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────
+
+
+def _validate_metric_window(period: int, minutes: int) -> dict[str, Any] | None:
+    """Return a structured validation error for a non-positive metric window."""
+    if period <= 0:
+        return {
+            "error": True,
+            "code": "ValidationError",
+            "message": "period must be a positive number of seconds",
+        }
+    if minutes <= 0:
+        return {
+            "error": True,
+            "code": "ValidationError",
+            "message": "minutes must be a positive number",
+        }
+    return None
 
 
 def _summarize(datapoints: list[dict[str, Any]]) -> dict[str, Any]:

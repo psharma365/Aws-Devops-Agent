@@ -98,3 +98,45 @@ class TestMemoryAndDisk:
     async def test_get_disk_usage_no_agent(self, cloudwatch_with_metrics):
         result = await get_disk_usage("i-0abc123def456789a", mount_path="/")
         assert result["instance_id"] == "i-0abc123def456789a"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("tool", "args"),
+    [
+        (get_cpu_metrics, ("i-test",)),
+        (get_cpu_metrics_for_instances, (["i-test"],)),
+        (get_memory_metrics, ("i-test",)),
+        (get_disk_usage, ("i-test",)),
+    ],
+)
+@pytest.mark.parametrize(
+    ("period", "minutes", "message"),
+    [
+        (0, 60, "period must be a positive number of seconds"),
+        (-1, 60, "period must be a positive number of seconds"),
+        (300, 0, "minutes must be a positive number"),
+        (300, -1, "minutes must be a positive number"),
+    ],
+)
+async def test_metric_tools_reject_non_positive_windows_without_cloudwatch(
+    monkeypatch,
+    tool,
+    args,
+    period,
+    minutes,
+    message,
+):
+    def unexpected_cloudwatch_client(_service: str):
+        raise AssertionError("CloudWatch client should not be created for invalid windows")
+
+    monkeypatch.setattr("src.mcp_servers.monitoring.tools.get_client", unexpected_cloudwatch_client)
+
+    result = await tool(*args, period=period, minutes=minutes)
+
+    assert result == {
+        "error": True,
+        "code": "ValidationError",
+        "message": message,
+    }

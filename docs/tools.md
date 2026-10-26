@@ -9,6 +9,8 @@
 | `get_cpu_metrics_for_instances_tool` | `instance_ids[]` | Fetches CPU metrics for multiple instances simultaneously |
 | `remediate_high_cpu_tool` | `instance_id`, `pid` (int) | Kills the specified process on the instance via SSM (`kill -9 <pid>`) |
 
+CPU, memory, and disk metric tools require positive `period` (seconds) and `minutes` (lookback) values. Invalid windows return a validation error without querying CloudWatch.
+
 ---
 
 ## Memory Tools
