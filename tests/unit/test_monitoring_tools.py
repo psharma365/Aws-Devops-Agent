@@ -140,3 +140,43 @@ async def test_metric_tools_reject_non_positive_windows_without_cloudwatch(
         "code": "ValidationError",
         "message": message,
     }
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("tool", "args"),
+    [
+        (get_cpu_metrics, ("",)),
+        (get_memory_metrics, ("  ",)),
+        (get_disk_usage, ("",)),
+        (get_cpu_metrics_for_instances, (["i-valid", "  "],)),
+    ],
+)
+async def test_metric_tools_reject_blank_instance_ids_without_cloudwatch(monkeypatch, tool, args):
+    def unexpected_cloudwatch_client(_service: str):
+        raise AssertionError("CloudWatch client should not be created for blank instance IDs")
+
+    monkeypatch.setattr("src.mcp_servers.monitoring.tools.get_client", unexpected_cloudwatch_client)
+
+    result = await tool(*args)
+
+    assert result["error"] is True
+    assert result["code"] == "ValidationError"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_get_disk_usage_rejects_blank_mount_path_without_cloudwatch(monkeypatch):
+    def unexpected_cloudwatch_client(_service: str):
+        raise AssertionError("CloudWatch client should not be created for a blank mount path")
+
+    monkeypatch.setattr("src.mcp_servers.monitoring.tools.get_client", unexpected_cloudwatch_client)
+
+    result = await get_disk_usage("i-test", mount_path="  ")
+
+    assert result == {
+        "error": True,
+        "code": "ValidationError",
+        "message": "mount_path must be a non-empty path",
+    }

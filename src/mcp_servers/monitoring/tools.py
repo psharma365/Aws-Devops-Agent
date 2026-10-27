@@ -34,6 +34,8 @@ async def get_cpu_metrics(
         Dict with ``instance_id``, ``datapoints`` (timestamp, average,
         max, min), and ``summary`` (avg, peak, latest).
     """
+    if error := _validate_instance_id(instance_id):
+        return error
     if error := _validate_metric_window(period, minutes):
         return error
 
@@ -93,6 +95,13 @@ async def get_cpu_metrics_for_instances(
     Returns:
         Dict mapping each instance_id to its metrics result.
     """
+    invalid_ids = [iid for iid in instance_ids if not isinstance(iid, str) or not iid.strip()]
+    if invalid_ids:
+        return {
+            "error": True,
+            "code": "ValidationError",
+            "message": "instance_ids must contain only non-empty instance IDs",
+        }
     if error := _validate_metric_window(period, minutes):
         return error
 
@@ -120,6 +129,8 @@ async def get_memory_metrics(
         Dict with datapoints and summary, or a stub message if the
         CloudWatch Agent is not installed.
     """
+    if error := _validate_instance_id(instance_id):
+        return error
     if error := _validate_metric_window(period, minutes):
         return error
 
@@ -183,6 +194,14 @@ async def get_disk_usage(
     Returns:
         Dict with datapoints and summary.
     """
+    if error := _validate_instance_id(instance_id):
+        return error
+    if not isinstance(mount_path, str) or not mount_path.strip():
+        return {
+            "error": True,
+            "code": "ValidationError",
+            "message": "mount_path must be a non-empty path",
+        }
     if error := _validate_metric_window(period, minutes):
         return error
 
@@ -235,6 +254,17 @@ async def get_disk_usage(
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────
+
+
+def _validate_instance_id(instance_id: str) -> dict[str, Any] | None:
+    """Return a structured validation error when an instance ID is blank."""
+    if not isinstance(instance_id, str) or not instance_id.strip():
+        return {
+            "error": True,
+            "code": "ValidationError",
+            "message": "instance_id must be a non-empty string",
+        }
+    return None
 
 
 def _validate_metric_window(period: int, minutes: int) -> dict[str, Any] | None:
